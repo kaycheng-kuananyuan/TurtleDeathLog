@@ -1,17 +1,17 @@
 -- ==========================================================
--- UI.lua - Turtle Death Log (打通核心枢纽版 + 修复盲哑按钮)
+-- UI.lua - Turtle Death Log (完美排版 + 国际版实时翻译显示)
 -- ==========================================================
 
 local L = {}
 if GetLocale() == "zhCN" then
-    L["TITLE"] = "全网死亡记录查询 (TDL v1.2.7)"
+    L["TITLE"] = "全网死亡记录查询 (TDL v1.3.0)"
     L["MIN_LVL"] = "最低"
     L["MAX_LVL"] = "最高"
     L["ZONE"] = "查询(地点/死因)"
     L["BTN_SEARCH"] = "查询"
     L["BTN_SYNC"] = "刷新同步"
     L["BTN_OLDER"] = "查询更久"
-    L["BTN_FIX"] = "同步字典"
+    L["BTN_FIX"] = "整理/查重"
     L["BTN_BUG"] = "报告另类死亡"
     L["BTN_START"] = "开启插件"
     L["BTN_ON"] = "插件已开启"
@@ -24,15 +24,15 @@ if GetLocale() == "zhCN" then
     L["H_TIME"] = "死亡时间"
     L["CLICK_TOGGLE"] = "左键点击: 开启/关闭面板\n左键拖动: 改变图标位置"
 else
-    L["TITLE"] = "Turtle Death Log (TDL v1.2.7)"
+    L["TITLE"] = "Turtle Death Log (TDL v1.3.0)"
     L["MIN_LVL"] = "Min"
     L["MAX_LVL"] = "Max"
     L["ZONE"] = "Zone / Killer"
     L["BTN_SEARCH"] = "Search"
     L["BTN_SYNC"] = "Sync"
     L["BTN_OLDER"] = "Load Older"
-    L["BTN_FIX"] = "Sync Dict"
-    L["BTN_BUG"] = "Report Custom"
+    L["BTN_FIX"] = "Cleanse DB"
+    L["BTN_BUG"] = "Custom Death"
     L["BTN_START"] = "Turn on Plugin"
     L["BTN_ON"] = "Plugin is ON"
     L["JOIN_DESC"] = "Data Sharing Protocol:"
@@ -117,7 +117,6 @@ searchBtn:SetPoint("TOPLEFT", TDL_MainFrame, "TOPLEFT", x4, -64)
 searchBtn:SetText(L["BTN_SEARCH"])
 searchBtn:SetScript("OnClick", function() TDL_UpdateList() end)
 
--- 【重大修复】：按钮不再盲目发信，直接调用 Core.lua 的绝对安全底层接口
 local syncBtn = CreateFrame("Button", "TDL_SyncButton", TDL_MainFrame, "UIPanelButtonTemplate")
 syncBtn:SetWidth(70)
 syncBtn:SetHeight(22)
@@ -127,7 +126,7 @@ syncBtn:SetScript("OnClick", function()
     if TDL_RequestSync then
         TDL_RequestSync()
     else
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDL]|r 核心模块未加载，无法同步！")
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDL-Error]|r 核心模块未加载，无法同步！")
     end
     TDL_UpdateList()
 end)
@@ -140,8 +139,8 @@ olderBtn:SetText(L["BTN_OLDER"])
 olderBtn:SetScript("OnClick", function()
     TDL_ViewAllHistory = not TDL_ViewAllHistory
     if TDL_ViewAllHistory then
-        this:SetText("收起历史")
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDL]|r 正在跨库读取往月历史数据，请稍候...")
+        this:SetText(GetLocale() == "zhCN" and "收起历史" or "Hide Older")
+        DEFAULT_CHAT_FRAME:AddMessage(GetLocale() == "zhCN" and "|cff00ff00[TDL]|r 正在跨库读取往月历史数据，请稍候..." or "|cff00ff00[TDL]|r Loading historical databases...")
     else
         this:SetText(L["BTN_OLDER"])
     end
@@ -154,66 +153,9 @@ fixBtn:SetHeight(22)
 fixBtn:SetPoint("TOPLEFT", TDL_MainFrame, "TOPLEFT", x7, -64)
 fixBtn:SetText(L["BTN_FIX"])
 fixBtn:SetScript("OnClick", function()
-    local fixCount = 0
-    if type(TDL_HistoryDB) == "table" then
-        for month, dataArr in pairs(TDL_HistoryDB) do
-            for i, dataStr in ipairs(dataArr) do
-                local parts = {}
-                local currentPos = 1
-                while true do
-                    local startPos, endPos = string.find(dataStr, "#", currentPos)
-                    if not startPos then table.insert(parts, string.sub(dataStr, currentPos)) break end
-                    table.insert(parts, string.sub(dataStr, currentPos, startPos - 1))
-                    currentPos = endPos + 1
-                end
-                
-                local name, lvl, zone, killer, timeStr
-                if table.getn(parts) >= 7 then
-                    name, lvl, zone, killer, timeStr = parts[1], parts[2], parts[5], parts[6], parts[7]
-                elseif table.getn(parts) >= 5 then
-                    name, lvl, zone, killer, timeStr = parts[1], parts[2], parts[3], parts[4], parts[5]
-                end
-                
-                if name and killer and zone then
-                    local originalData = dataStr
-                    local originalKiller = killer
-                    if string.find(killer, " %-pvp$") then
-                        originalKiller = string.sub(killer, 1, string.len(killer) - 5)
-                    end
-                    
-                    if GetLocale() == "zhCN" and TDL_Translate then
-                        zone = TDL_Translate(zone, "ZONE")
-                        killer = TDL_Translate(originalKiller, "NPC")
-                    else
-                        killer = originalKiller
-                    end
-                    
-                    local isPvP = false
-                    if TDL_PvP_NPC_Dict and (TDL_PvP_NPC_Dict[originalKiller] or TDL_PvP_NPC_Dict[killer]) then
-                        isPvP = true
-                    end
-                    
-                    if not isPvP and originalKiller ~= "Environment" then
-                        if not ((TDL_NPCDict and TDL_NPCDict[originalKiller]) or (TDL_TempNPCDict and TDL_TempNPCDict[originalKiller])) then
-                            if not string.find(originalKiller, " ") and string.find(originalKiller, "^[a-zA-Z]+$") then
-                                isPvP = true
-                            end
-                        end
-                    end
-                    
-                    if isPvP then killer = killer .. " -pvp" end
-                    
-                    local newData = name.."#"..lvl.."#"..zone.."#"..killer.."#"..timeStr
-                    if originalData ~= newData then
-                        TDL_HistoryDB[month][i] = newData
-                        fixCount = fixCount + 1
-                    end
-                end
-            end
-        end
+    if SlashCmdList["TURTLEDEATHLOG"] then
+        SlashCmdList["TURTLEDEATHLOG"]("fix")
     end
-    if TDL_UpdateList then TDL_UpdateList() end
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDL]|r 数据与字典同步完成！共重译、修复了 " .. fixCount .. " 条记录。")
 end)
 
 local bugBtn = CreateFrame("Button", "TDL_BugButton", TDL_MainFrame, "UIPanelButtonTemplate")
@@ -270,13 +212,17 @@ StaticPopupDialogs["TDL_CONFIRM_BUG_DEATH"] = {
     OnAccept = function()
         local name, lvl = UnitName("player"), UnitLevel("player")
         local zone = GetZoneText() or "Unknown Zone"
-        local killer = (GetLocale() == "zhCN") and "|cffFF0000自定义死因|r" or "|cffFF0000Custom Cause|r"
-        local deathData = name.."#"..lvl.."#"..zone.."#"..killer.."#"..date("%Y-%m-%d %H:%M:%S")
+        -- 核心：作为国际版，自定义死因必须存为英文，显示时再靠UI翻译！
+        local killer = "Custom Cause" 
+        
+        local timeStr = TDL_GetServerTimeStr and TDL_GetServerTimeStr() or date("%Y-%m-%d %H:%M")
+        local deathData = name.."#"..lvl.."#"..zone.."#"..killer.."#"..timeStr
         local m = date("%Y-%m")
+        
         if type(TDL_HistoryDB[m]) ~= "table" then TDL_HistoryDB[m] = {} end
         table.insert(TDL_HistoryDB[m], deathData)
         if TDL_RequestSync then
-            table.insert(TDL_SendQueue, "TDL_DEATH:"..m.."|"..deathData)
+            table.insert(TDL_SendQueue, "TDL_DEATH:"..m.."^"..deathData)
         end
         TDL_UpdateList()
     end,
@@ -370,18 +316,41 @@ function TDL_UpdateList()
                     currentPos = endPos + 1
                 end
                 
-                local name, lvl, zone, killer, timeStr
+                local name, lvl, rawZone, rawKiller, timeStr
                 if table.getn(parts) >= 7 then
-                    name, lvl, zone, killer, timeStr = parts[1], parts[2], parts[5], parts[6], parts[7]
+                    name, lvl, rawZone, rawKiller, timeStr = parts[1], parts[2], parts[5], parts[6], parts[7]
                 elseif table.getn(parts) >= 5 then
-                    name, lvl, zone, killer, timeStr = parts[1], parts[2], parts[3], parts[4], parts[5]
+                    name, lvl, rawZone, rawKiller, timeStr = parts[1], parts[2], parts[3], parts[4], parts[5]
                 end
                 
                 if name then
+                    -- 【国际版架构：UI 层实时翻译】
+                    local dispZone = rawZone
+                    local dispKiller = rawKiller
+                    
+                    if GetLocale() == "zhCN" and TDL_Translate then
+                        dispZone = TDL_Translate(rawZone, "ZONE")
+                        
+                        local origK = rawKiller
+                        local isPvP = false
+                        if string.find(string.lower(rawKiller), " %-pvp$") then
+                            origK = string.sub(rawKiller, 1, string.len(rawKiller) - 5)
+                            isPvP = true
+                        end
+                        
+                        dispKiller = TDL_Translate(origK, "NPC")
+                        if dispKiller == "Custom Cause" then dispKiller = "|cffFF0000自定义死因|r" end
+                        if isPvP then dispKiller = dispKiller .. " -pvp" end
+                    end
+                    
                     local match = true
                     if tonumber(lvl) < minLvl or tonumber(lvl) > maxLvl then match = false end
-                    if fZone ~= "" and not string.find(SafeLower(zone), fZone, 1, true) and not string.find(SafeLower(killer), fZone, 1, true) then match = false end
-                    if match then table.insert(filteredData, {name, lvl, zone, killer, timeStr}) end
+                    -- 双语兼容搜索：搜中文（翻译后）或英文（原始名）都可以命中
+                    if fZone ~= "" and not string.find(SafeLower(dispZone), fZone, 1, true) and not string.find(SafeLower(dispKiller), fZone, 1, true) and not string.find(SafeLower(rawZone), fZone, 1, true) and not string.find(SafeLower(rawKiller), fZone, 1, true) then 
+                        match = false 
+                    end
+                    
+                    if match then table.insert(filteredData, {name, lvl, dispZone, dispKiller, timeStr}) end
                 end
             end
         end
