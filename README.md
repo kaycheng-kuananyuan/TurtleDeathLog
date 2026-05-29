@@ -1,26 +1,28 @@
-Turtle Death Log (TDL) - Hardcore Death Tracker & P2P Sync Grid for Turtle WoW
-Turtle Death Log (TDL) - 乌龟服硬核死亡记录与全网同步网格
-Turtle Death Log (TDL) is a lightweight, decentralized death tracker and synchronization add-on specifically designed for the World of Warcraft 1.12 Vanilla Hardcore mode.
+
+
+乌龟死亡日志 (TDL) - 乌龟魔兽世界硬核死亡追踪器和P2P同步网格
+乌龟服硬核死亡记录与全网同步网格
+Turtle Death Log (TDL) 是一个轻量级的、去中心化的死亡追踪器和同步附加组件，专为《魔兽世界》1.12原版硬核模式设计。
 Turtle Death Log (TDL) 是一款专为《魔兽世界》1.12 香草时代硬核（Hardcore）模式打造的轻量级、去中心化死亡追踪与全网同步插件。
 
-More than just a local death logger, TDL builds an invisible P2P data synchronization network based on the CSMA/CD (Carrier-Sense Multiple Access with Collision Detection) concept, overcoming the extremely restricted underlying APIs of the 1.12 client. By simply enabling the add-on, players can silently share and receive hardcore death data across the entire network in the background, collectively weaving an epic epitaph for hardcore players.
+TDL不仅仅是一个本地死亡记录器，它基于CSMA/CD（载波检测多址访问与碰撞检测）概念，建立了一个看不见的P2P数据同步网络，克服了1.12客户端极其受限的底层API。只需启用插件，玩家就可以在后台安静地分享和接收硬核死亡数据，共同编织硬核玩家的史诗墓志铭。
 TDL 不仅仅是一个本地的死亡记录器，它还在 1.12 极其受限的底层 API 中，构建了一个基于 CSMA/CD（载波侦听多路访问/冲突检测）理念的隐形 P2P 数据同步网络。玩家只需开启插件，即可在后台静默共享和接收全网的硬核死亡数据，共同编织一部硬核玩家的史诗墓志铭。
 
-✨ Core Features
+✨ 核心功能
 ✨ 核心特性
-🌐 Invisible P2P Synchronization Grid
+🌐隐形P2P同步网格
 
 🌐 隐形 P2P 全网同步网格
 
-Utilizes a hidden underlying channel (tdl_sync_channel_v1) for silent data handshakes.
+利用隐藏的底层通道（tdl_sync_channel_v1）进行静默数据握手。
 
 利用底层隐藏频道（tdl_sync_channel_v1）进行静默数据握手。
 
-Dynamic Node Radar & Backoff Algorithm: Intelligently detects the number of active nodes in the current network and dynamically scales the synchronization roll delay (dice mechanism). Through silent background listening, it completely eliminates "broadcast storms" and channel crashes caused by multiple players sending data simultaneously.
+动态节点雷达和退避算法：智能检测当前网络中活动节点的数量，并动态调整同步滚转延迟（骰子机制）。通过静默背景监听，完全消除由多个玩家同时发送数据引起的“广播风暴”和频道崩溃。
 
 动态节点雷达与退避算法： 智能侦测当前网络活跃人数，动态放大同步掷点延迟（骰子机制）。通过后台静默监听，彻底杜绝多玩家同时发送数据引发的“广播风暴”和频道崩溃。
 
-🚀 SuperWoW Dual-Core Drive & Disconnect Protection
+🚀 SuperWoW 双核驱动 & 断连保护
 
 🚀 SuperWoW 双核驱动与防掉线保护
 
@@ -28,7 +30,7 @@ Dynamic Node Radar & Backoff Algorithm: Intelligently detects the number of acti
 
 内置智能探针。检测到普通客户端时，启用 3.5秒/条 的极限防掉线安全引擎；检测到安装了 SuperWoW 模组时，自动切换至 3.0秒/条 的提速同步引擎。
 
- GMT 全球统一时间线 & 智能去重
+GMT 全球统一时间线 & 智能去重
 
 🕸️ 全球统一时间轴与智能去重
 
@@ -36,33 +38,33 @@ Dynamic Node Radar & Backoff Algorithm: Intelligently detects the number of acti
 
 跨越时区：独创时差桥接算法，强制将所有本地数据转化为全球统一的24小时制服务器时间（精确到分钟），解决中外玩家因时差导致的克隆数据。
 
-Hardcore Data Cleansing Engine: As long as the "Name + Level + YYYY-MM-DD" match exactly, it is judged as the same death. It automatically "eliminates the inferior and retains the superior" (keeps the most complete translated fields) from multiple records, thoroughly eliminating duplicates caused by network latency.
+硬核数据清洗引擎：只要“名字 + 等级 + YYYY-MM-DD”完全匹配，就认为是同一次死亡。它会自动“淘汰 inferior 并保留 superior”（保留最完整的翻译字段），从多个记录中彻底消除由于网络延迟引起的重复。
 
 硬核级洗数据引擎： 只要“名字 + 等级 + 年月日”一致，即判定为同一次死亡，并自动从多条记录中“汰劣留良”（保留翻译最完整的字段），彻底消灭因网络延迟产生的重复冗余。
 
-📂 Monthly Independent File Storage
+📁 每月独立文件存储
 
 📂 按月分卷独立存储
 
-To completely solve the lag caused by the infinite expansion of log files, and to facilitate hardcore communities in publishing "casualty lists" by month on forums, TDL's data structure has been specially designed. All death records are saved monthly into independent file nodes (e.g., TDL_HistoryDB["2026-05"]).
+为了彻底解决由日志文件无限扩展引起的延迟问题，并方便硬核社区在论坛上按月发布“伤亡名单”，TDL的数据结构特别设计。所有死亡记录按月保存到独立的文件节点中（例如，TDL_HistoryDB["2026-05"]）。["2026-05"]).
 
-为了彻底解决日志文件无限膨胀导致的卡顿，并方便硬核社区在论坛上按月发布“阵亡名单”，TDL 的数据结构经过特别设计，所有死亡记录均按月保存至独立的文件节点中（如 TDL_HistoryDB["2026-05"]）。
+为了彻底解决日志文件无限膨胀导致的卡顿，并方便硬核社区在论坛上按月发布“阵亡名单”，TDL 的数据结构经过特别设计，所有死亡记录均按月保存至独立的文件节点中（如 TDL_HistoryDB["2026-05"]）。["2026-05"]）。
 
-🔤 Highly Extensible Localization Dictionary
+ 🔤 高度可扩展的本地化词典
 
-🔤 高度可拓展的汉化字典
+ 🔤 高度可拓展的汉化字典
 
-Built-in standardized English-Chinese core dictionary, with dedicated areas for TDL_TempZoneDict (temporary zones) and TDL_TempNPCDict (temporary mobs). When encountering a new mob, it can be perfectly translated with just one simple line of code.
+内置标准化的英汉核心词典，专用区域用于TDL_TempZoneDict（临时区域）和TDL_TempNPCDict（临时NPC）。遇到新的NPC时，只需一行简单的代码即可完美翻译。
 
 内置标准化的中英对照核心字典，并提供 TDL_TempZoneDict（临时地名）和 TDL_TempNPCDict（临时怪物）专区。遇到新怪物，只需简单一行代码即可完美汉化。
 
-📦 Installation
+📦 安装
 📦 安装说明
-Download the TurtleDeathLog folder.
+下载TurtleDeathLog文件夹。
 
 下载 TurtleDeathLog 文件夹。
 
-Extract it and place it into your World of Warcraft AddOns directory: World of Warcraft\Interface\AddOns\.
+解压并将其放入你的魔兽世界插件目录：魔兽世界\Interface\AddOns\。
 
 将其解压并放入你的魔兽世界插件目录：World of Warcraft\Interface\AddOns\。
 
