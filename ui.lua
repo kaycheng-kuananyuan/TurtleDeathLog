@@ -4,7 +4,7 @@
 
 local L = {}
 if GetLocale() == "zhCN" then
-    L["TITLE"] = "全网死亡记录查询 (TDL v1.3.0)"
+    L["TITLE"] = "全网死亡记录查询 (TDL v1.3.2)"
     L["MIN_LVL"] = "最低"
     L["MAX_LVL"] = "最高"
     L["ZONE"] = "查询(地点/死因)"
@@ -24,7 +24,7 @@ if GetLocale() == "zhCN" then
     L["H_TIME"] = "死亡时间"
     L["CLICK_TOGGLE"] = "左键点击: 开启/关闭面板\n左键拖动: 改变图标位置"
 else
-    L["TITLE"] = "Turtle Death Log (TDL v1.3.0)"
+    L["TITLE"] = "Turtle Death Log (TDL v1.3.2)"
     L["MIN_LVL"] = "Min"
     L["MAX_LVL"] = "Max"
     L["ZONE"] = "Zone / Killer"
