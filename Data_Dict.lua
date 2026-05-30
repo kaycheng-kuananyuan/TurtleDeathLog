@@ -1,6 +1,6 @@
--- Data_Dict.lua - TDL-data(v1.2.7)
+-- Data_Dict.lua - TDL-data(v1.3.0)
 -- 更新说明：更新了临时地区和临时怪物的手动添加区域
-TDL_Dict_Version = "1.2.7"
+TDL_Dict_Version = "1.3.0"
 
 TDL_ZoneDict = {
 -- ========== 原有条目 ==========
