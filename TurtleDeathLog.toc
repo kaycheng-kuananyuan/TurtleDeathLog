@@ -1,12 +1,17 @@
 ## Interface: 11200
 ## Title: Turtle Death Log
 ## Notes: Hardcore death records auto-collection & query. Share data via P2P channel.
-## Title-zhCN: |cffff0000[硬核]|r乌龟服死亡记录器
+## Title-zhCN: |cffff0000[硬核]|r乌龟服死亡记录器 V1.3.0
 ## Notes-zhCN: |cffff0000硬核模式死亡收录|r自动记录并共享死亡信息。命令：/tdl /tdl fix数据清洗
-## Version: V1.2.7
+## Version: V1.3.0
 ## DefaultState: Enabled
 ## SavedVariables: TDL_HistoryDB
 
 Data_Dict.lua
 Core.lua
 UI.lua
+
+## X-PluginId: 302
+## X-PublishTime: 2026-05-29 16:16:16
+## X-Version: 20260529003
+## X-OverrideMode: 1
