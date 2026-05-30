@@ -1,5 +1,5 @@
 -- ==========================================================
--- Core.lua - Turtle Death Log (V1.3.0 - 完美国际版双核架构)
+-- Core.lua - Turtle Death Log (V1.3.2 - 完美国际版 + 绝对防崩溃护甲)
 -- ==========================================================
 if type(TDL_HistoryDB) ~= "table" then TDL_HistoryDB = {} end
 local currentMonth = date("%Y-%m")
@@ -39,7 +39,45 @@ local function TDL_BgMsg(cnText, enText)
     DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[TDL-Sync]|r " .. txt)
 end
 
--- 全球统一服务器时间生成器
+-- ==========================================================
+-- 【核心黑科技：逆向反编译引擎 (中文 -> 英文)】
+-- ==========================================================
+local TDL_Reverse_Zone = nil
+local TDL_Reverse_NPC = nil
+
+local function InitReverseDicts()
+    if TDL_Reverse_Zone then return end
+    TDL_Reverse_Zone = {}
+    TDL_Reverse_NPC = {}
+    
+    local function addRev(dict, target)
+        if type(dict) == "table" then
+            for en, cn in pairs(dict) do
+                if type(cn) == "string" and type(en) == "string" then
+                    target[cn] = en
+                end
+            end
+        end
+    end
+    
+    addRev(TDL_ZoneDict, TDL_Reverse_Zone)
+    addRev(TDL_TempZoneDict, TDL_Reverse_Zone)
+    addRev(TDL_NPCDict, TDL_Reverse_NPC)
+    addRev(TDL_TempNPCDict, TDL_Reverse_NPC)
+    addRev(TDL_PvP_NPC_Dict, TDL_Reverse_NPC)
+end
+
+local function TDL_GetEnglish(cnText, dictType)
+    if not cnText or cnText == "" then return cnText end
+    InitReverseDicts()
+    if dictType == "ZONE" then
+        return TDL_Reverse_Zone[cnText] or cnText
+    elseif dictType == "NPC" then
+        return TDL_Reverse_NPC[cnText] or cnText
+    end
+    return cnText
+end
+
 function TDL_GetServerTimeStr()
     local srvHour, srvMin = GetGameTime()
     local locTime = time()
@@ -104,7 +142,7 @@ local function MergeBestData(z1, k1, z2, k2)
 end
 
 -- ==========================================================
--- 【数据库智能洗涤引擎 (底层全英文)】
+-- 【数据库智能洗涤与反编译引擎 (增强防崩溃防畸形护甲)】
 -- ==========================================================
 local function TDL_CleanDatabase(isAuto)
     local fixCount = 0
@@ -131,11 +169,26 @@ local function TDL_CleanDatabase(isAuto)
                 
                 if name and timeStr then
                     local originalData = dataStr
+                    local safeKiller = killer or "Unknown"
+                    local safeZone = zone or "Unknown Zone"
                     
-                    -- 【国际版架构】：洗数据时，不再进行中文翻译覆盖，保留原汁原味的英文。
+                    if GetLocale() == "zhCN" then
+                        local origK = safeKiller
+                        local isPvP = false
+                        if string.find(string.lower(origK), " %-pvp$") then
+                            origK = string.sub(origK, 1, string.len(origK) - 5)
+                            isPvP = true
+                        end
+                        safeZone = TDL_GetEnglish(safeZone, "ZONE") or "Unknown Zone"
+                        safeKiller = TDL_GetEnglish(origK, "NPC") or "Unknown"
+                        if isPvP then safeKiller = safeKiller .. " -pvp" end
+                    end
+                    
                     local targetDate = GetDateOnly(timeStr)
                     local targetFullTime = GetMinuteTime(timeStr)
-                    local newData = name.."#"..lvl.."#"..zone.."#"..killer.."#"..targetFullTime
+                    
+                    -- 安全拼接，杜绝任何 nil 带来的崩溃
+                    local newData = name.."#"..(lvl or "0").."#"..safeZone.."#"..safeKiller.."#"..(targetFullTime or "2000-01-01 00:00")
                     
                     local isDup = false
                     for j, oData in ipairs(newMonthArr) do
@@ -152,12 +205,14 @@ local function TDL_CleanDatabase(isAuto)
                         local oLvl = oParts[2]
                         local oDate = GetDateOnly(oParts[5])
                         
-                        if oName == name and oLvl == lvl and oDate == targetDate then
+                        if oName == name and (oLvl or "0") == (lvl or "0") and oDate == targetDate then
                             isDup = true
-                            local bestZ, bestK = MergeBestData(zone, killer, oParts[3], oParts[4])
-                            local bestL = lvl or oLvl
-                            local bestTime = GetBest24HTime(targetFullTime, GetMinuteTime(oParts[5]))
-                            local mergedData = oName.."#"..bestL.."#"..bestZ.."#"..bestK.."#"..bestTime
+                            local bestZ, bestK = MergeBestData(safeZone, safeKiller, oParts[3], oParts[4])
+                            local bestL = lvl or oLvl or "0"
+                            local bestTime = GetBest24HTime(targetFullTime, GetMinuteTime(oParts[5])) or targetFullTime or "2000-01-01 00:00"
+                            
+                            -- 终极护甲拼接
+                            local mergedData = (oName or "Unknown").."#"..bestL.."#"..(bestZ or "Unknown Zone").."#"..(bestK or "Unknown").."#"..bestTime
                             
                             if newMonthArr[j] ~= mergedData then
                                 newMonthArr[j] = mergedData
@@ -184,10 +239,10 @@ local function TDL_CleanDatabase(isAuto)
     
     if isAuto then
         if fixCount > 0 or dupCount > 0 then
-            TDL_BgMsg("后台自动整理完毕！清洗了 " .. dupCount .. " 条冗余数据。", "Background sync complete! Cleared " .. dupCount .. " redundant entries.")
+            TDL_BgMsg("后台自动反编译整理完毕！清洗了 " .. dupCount .. " 条冗余数据。", "Background sync complete! Cleared " .. dupCount .. " redundant entries.")
         end
     else
-        TDL_Msg("数据库智能整理完成！清理了 " .. dupCount .. " 条冗余重复数据。", "Database cleansed! Removed " .. dupCount .. " duplicate entries.")
+        TDL_Msg("数据库智能反编译完成！转译了 " .. fixCount .. " 条数据，清理了 " .. dupCount .. " 条冗余。", "Database cleansed! Translated " .. fixCount .. " entries and removed " .. dupCount .. " duplicates.")
     end
 end
 
@@ -221,11 +276,13 @@ local function InsertOrMergeRecord(month, dataStr)
         
         local oName, oLvl, oZone, oKiller, oTimeStr = oParts[1], oParts[2], oParts[3], oParts[4], oParts[5]
         
-        if oName == name and oLvl == lvl and GetDateOnly(oTimeStr) == targetDate then
+        if oName == name and (oLvl or "0") == (lvl or "0") and GetDateOnly(oTimeStr) == targetDate then
             local bestZone, bestKiller = MergeBestData(zone, killer, oZone, oKiller)
-            local bestLvl = lvl or oLvl
-            local bestTime = GetBest24HTime(targetFullTime, GetMinuteTime(oTimeStr))
-            local mergedData = oName.."#"..bestL.."#"..bestZone.."#"..bestKiller.."#"..bestTime
+            local bestLvl = lvl or oLvl or "0"
+            local bestTime = GetBest24HTime(targetFullTime, GetMinuteTime(oTimeStr)) or targetFullTime or "2000-01-01 00:00"
+            
+            -- 终极护甲拼接
+            local mergedData = (oName or "Unknown").."#"..bestLvl.."#"..(bestZone or "Unknown Zone").."#"..(bestKiller or "Unknown").."#"..bestTime
             
             if oldDataStr ~= mergedData then
                 TDL_HistoryDB[month][i] = mergedData 
@@ -235,7 +292,7 @@ local function InsertOrMergeRecord(month, dataStr)
         end
     end
     
-    local sanitizedData = name.."#"..lvl.."#"..zone.."#"..killer.."#"..targetFullTime
+    local sanitizedData = (name or "Unknown").."#"..(lvl or "0").."#"..(zone or "Unknown Zone").."#"..(killer or "Unknown").."#"..(targetFullTime or "2000-01-01 00:00")
     table.insert(TDL_HistoryDB[month], sanitizedData)
     return true
 end
@@ -397,7 +454,11 @@ local function ParseDeathMessage(msg)
         killer = string.gsub(killer, "^%s*(.-)%s*$", "%1")
         killer = string.gsub(killer, "[。！!，,]$", "")
         
-        -- 【国际版架构】：不再调用 TDL_Translate 将捕捉到的英文转为中文，直接以英文存储！
+        if GetLocale() == "zhCN" then
+            zone = TDL_GetEnglish(zone, "ZONE") or zone
+            killer = TDL_GetEnglish(killer, "NPC") or killer
+        end
+
         if isPvP and not string.find(string.lower(killer), "%-pvp") then killer = killer .. " -pvp" end
         return name, level, killer, zone
     end
@@ -420,7 +481,13 @@ coreFrame:SetScript("OnEvent", function()
         local name, level, killer, broadcastZone = ParseDeathMessage(arg1)
         if name and level and killer then
             local timeStr = TDL_GetServerTimeStr()
-            local zone = broadcastZone or GetZoneText() or "Unknown Zone"
+            
+            local rawFallbackZone = broadcastZone or GetZoneText() or "Unknown Zone"
+            if GetLocale() == "zhCN" and rawFallbackZone ~= "Unknown Zone" then
+                rawFallbackZone = TDL_GetEnglish(rawFallbackZone, "ZONE") or rawFallbackZone
+            end
+            local zone = rawFallbackZone
+            
             local deathData = name.."#"..level.."#"..zone.."#"..killer.."#"..timeStr
             
             local isNewOrUpdated = InsertOrMergeRecord(currentMonth, deathData)
@@ -487,7 +554,6 @@ coreFrame:SetScript("OnEvent", function()
                         local syncMonth = string.sub(payload, 1, pipePos - 1)
                         local dataStr = string.sub(payload, pipePos + 1)
                         
-                        -- 【国际版架构】：接收其他节点的数据时，原样保存，坚决不进行翻译！
                         local suppressMsg = PREFIX_DEATH .. syncMonth .. "^" .. dataStr
                         for i = table.getn(TDL_PendingSyncQueue), 1, -1 do
                             if TDL_PendingSyncQueue[i] == suppressMsg then 
