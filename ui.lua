@@ -1,16 +1,18 @@
 -- ==========================================================
--- UI.lua - Turtle Death Log (完美排版 + 国际版实时翻译显示)
+-- UI.lua - Turtle Death Log (V1.4.0 - 新增玩家姓名精准查询)
 -- ==========================================================
 
 local L = {}
 if GetLocale() == "zhCN" then
-    L["TITLE"] = "全网死亡记录查询 (TDL v1.3.2)"
+    L["TITLE"] = "全网死亡记录查询 (TDL v1.4.0)"
+    L["NAME_SEARCH"] = "玩家姓名"
     L["MIN_LVL"] = "最低"
     L["MAX_LVL"] = "最高"
     L["ZONE"] = "查询(地点/死因)"
     L["BTN_SEARCH"] = "查询"
     L["BTN_SYNC"] = "刷新同步"
     L["BTN_OLDER"] = "查询更久"
+    L["BTN_RECENT"] = "显示最近7天"
     L["BTN_FIX"] = "整理/查重"
     L["BTN_BUG"] = "报告另类死亡"
     L["BTN_START"] = "开启插件"
@@ -24,13 +26,15 @@ if GetLocale() == "zhCN" then
     L["H_TIME"] = "死亡时间"
     L["CLICK_TOGGLE"] = "左键点击: 开启/关闭面板\n左键拖动: 改变图标位置"
 else
-    L["TITLE"] = "Turtle Death Log (TDL v1.3.2)"
+    L["TITLE"] = "Turtle Death Log (TDL v1.4.0)"
+    L["NAME_SEARCH"] = "Player Name"
     L["MIN_LVL"] = "Min"
     L["MAX_LVL"] = "Max"
     L["ZONE"] = "Zone / Killer"
     L["BTN_SEARCH"] = "Search"
     L["BTN_SYNC"] = "Sync"
     L["BTN_OLDER"] = "Load Older"
+    L["BTN_RECENT"] = "Last 7 Days"
     L["BTN_FIX"] = "Cleanse DB"
     L["BTN_BUG"] = "Custom Death"
     L["BTN_START"] = "Turn on Plugin"
@@ -96,113 +100,79 @@ local function CreateFilterEditBox(name, parent, width, labelText, x, y)
     return eb
 end
 
-local startX, gap = 27, 18
+-- 重新计算横向排版，为“玩家姓名”腾出空间
+local startX, gap = 20, 10
 local x1 = startX
-local x2 = x1 + 40 + gap
-local x3 = x2 + 40 + gap
-local x4 = x3 + 130 + gap
-local x5 = x4 + 60 + gap
-local x6 = x5 + 70 + gap
-local x7 = x6 + 70 + gap
-local x8 = x7 + 80 + gap
+local x2 = x1 + 80 + gap   -- Name (80)
+local x3 = x2 + 40 + gap   -- MinLvl (40)
+local x4 = x3 + 40 + gap   -- MaxLvl (40)
+local x5 = x4 + 110 + gap  -- Zone (110)
+local x6 = x5 + 60 + gap   -- Search (60)
+local x7 = x6 + 65 + gap   -- Sync (65)
+local x8 = x7 + 85 + gap   -- Older (85)
+local x9 = x8 + 75 + gap   -- Fix (75)
+-- BugBtn is at x9 (Width 85)
 
-TDL_MinLevelEB = CreateFilterEditBox("TDL_MinLevelEB", TDL_MainFrame, 40, L["MIN_LVL"], x1, -65)
-TDL_MaxLevelEB = CreateFilterEditBox("TDL_MaxLevelEB", TDL_MainFrame, 40, L["MAX_LVL"], x2, -65)
-TDL_ZoneEB     = CreateFilterEditBox("TDL_ZoneEB", TDL_MainFrame, 130, L["ZONE"], x3, -65)
+TDL_NameEB     = CreateFilterEditBox("TDL_NameEB", TDL_MainFrame, 80, L["NAME_SEARCH"], x1, -65)
+TDL_MinLevelEB = CreateFilterEditBox("TDL_MinLevelEB", TDL_MainFrame, 40, L["MIN_LVL"], x2, -65)
+TDL_MaxLevelEB = CreateFilterEditBox("TDL_MaxLevelEB", TDL_MainFrame, 40, L["MAX_LVL"], x3, -65)
+TDL_ZoneEB     = CreateFilterEditBox("TDL_ZoneEB", TDL_MainFrame, 110, L["ZONE"], x4, -65)
 
 local searchBtn = CreateFrame("Button", "TDL_SearchButton", TDL_MainFrame, "UIPanelButtonTemplate")
-searchBtn:SetWidth(60)
-searchBtn:SetHeight(22)
-searchBtn:SetPoint("TOPLEFT", TDL_MainFrame, "TOPLEFT", x4, -64)
-searchBtn:SetText(L["BTN_SEARCH"])
-searchBtn:SetScript("OnClick", function() TDL_UpdateList() end)
+searchBtn:SetWidth(60); searchBtn:SetHeight(22); searchBtn:SetPoint("TOPLEFT", TDL_MainFrame, "TOPLEFT", x5, -64)
+searchBtn:SetText(L["BTN_SEARCH"]); searchBtn:SetScript("OnClick", function() TDL_UpdateList() end)
 
 local syncBtn = CreateFrame("Button", "TDL_SyncButton", TDL_MainFrame, "UIPanelButtonTemplate")
-syncBtn:SetWidth(70)
-syncBtn:SetHeight(22)
-syncBtn:SetPoint("TOPLEFT", TDL_MainFrame, "TOPLEFT", x5, -64)
+syncBtn:SetWidth(65); syncBtn:SetHeight(22); syncBtn:SetPoint("TOPLEFT", TDL_MainFrame, "TOPLEFT", x6, -64)
 syncBtn:SetText(L["BTN_SYNC"])
 syncBtn:SetScript("OnClick", function()
-    if TDL_RequestSync then
-        TDL_RequestSync()
-    else
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDL-Error]|r 核心模块未加载，无法同步！")
-    end
+    if TDL_RequestSync then TDL_RequestSync() else DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDL-Error]|r 核心模块未加载！") end
     TDL_UpdateList()
 end)
 
 local olderBtn = CreateFrame("Button", "TDL_OlderButton", TDL_MainFrame, "UIPanelButtonTemplate")
-olderBtn:SetWidth(70)
-olderBtn:SetHeight(22)
-olderBtn:SetPoint("TOPLEFT", TDL_MainFrame, "TOPLEFT", x6, -64)
+olderBtn:SetWidth(85); olderBtn:SetHeight(22); olderBtn:SetPoint("TOPLEFT", TDL_MainFrame, "TOPLEFT", x7, -64)
 olderBtn:SetText(L["BTN_OLDER"])
 olderBtn:SetScript("OnClick", function()
     TDL_ViewAllHistory = not TDL_ViewAllHistory
     if TDL_ViewAllHistory then
-        this:SetText(GetLocale() == "zhCN" and "收起历史" or "Hide Older")
-        DEFAULT_CHAT_FRAME:AddMessage(GetLocale() == "zhCN" and "|cff00ff00[TDL]|r 正在跨库读取往月历史数据，请稍候..." or "|cff00ff00[TDL]|r Loading historical databases...")
+        this:SetText(L["BTN_RECENT"])
+        DEFAULT_CHAT_FRAME:AddMessage(GetLocale() == "zhCN" and "|cff00ff00[TDL]|r 正在为您拉取全部历史死亡数据..." or "|cff00ff00[TDL]|r Loading historical databases...")
     else
         this:SetText(L["BTN_OLDER"])
+        DEFAULT_CHAT_FRAME:AddMessage(GetLocale() == "zhCN" and "|cff00ff00[TDL]|r 已切回显示最近7天数据。" or "|cff00ff00[TDL]|r Showing recent 7 days.")
     end
     TDL_UpdateList()
 end)
 
 local fixBtn = CreateFrame("Button", "TDL_FixButton", TDL_MainFrame, "UIPanelButtonTemplate")
-fixBtn:SetWidth(80)
-fixBtn:SetHeight(22)
-fixBtn:SetPoint("TOPLEFT", TDL_MainFrame, "TOPLEFT", x7, -64)
-fixBtn:SetText(L["BTN_FIX"])
-fixBtn:SetScript("OnClick", function()
-    if SlashCmdList["TURTLEDEATHLOG"] then
-        SlashCmdList["TURTLEDEATHLOG"]("fix")
-    end
-end)
+fixBtn:SetWidth(75); fixBtn:SetHeight(22); fixBtn:SetPoint("TOPLEFT", TDL_MainFrame, "TOPLEFT", x8, -64)
+fixBtn:SetText(L["BTN_FIX"]); fixBtn:SetScript("OnClick", function() if SlashCmdList["TURTLEDEATHLOG"] then SlashCmdList["TURTLEDEATHLOG"]("fix") end end)
 
 local bugBtn = CreateFrame("Button", "TDL_BugButton", TDL_MainFrame, "UIPanelButtonTemplate")
-bugBtn:SetWidth(90)
-bugBtn:SetHeight(22)
-bugBtn:SetPoint("TOPLEFT", TDL_MainFrame, "TOPLEFT", x8, -64)
-bugBtn:SetText(L["BTN_BUG"])
-bugBtn:SetScript("OnClick", function() StaticPopup_Show("TDL_CONFIRM_BUG_DEATH") end)
+bugBtn:SetWidth(85); bugBtn:SetHeight(22); bugBtn:SetPoint("TOPLEFT", TDL_MainFrame, "TOPLEFT", x9, -64)
+bugBtn:SetText(L["BTN_BUG"]); bugBtn:SetScript("OnClick", function() StaticPopup_Show("TDL_CONFIRM_BUG_DEATH") end)
 
 local toggleBtn = CreateFrame("Button", "TDL_ToggleBtn", TDL_MainFrame, "UIPanelButtonTemplate")
-toggleBtn:SetWidth(100)
-toggleBtn:SetHeight(22)
-toggleBtn:SetPoint("BOTTOMRIGHT", TDL_MainFrame, "BOTTOMRIGHT", -25, 20)
-
+toggleBtn:SetWidth(100); toggleBtn:SetHeight(22); toggleBtn:SetPoint("BOTTOMRIGHT", TDL_MainFrame, "BOTTOMRIGHT", -25, 20)
 toggleBtn:SetScript("OnClick", function()
     TDL_UI_Unlocked = true
-    this:SetText(L["BTN_ON"])
-    this:Disable() 
-    
+    this:SetText(L["BTN_ON"]); this:Disable() 
     local id = GetChannelName("tdl_sync_channel_v1")
     if id == 0 then JoinChannelByName("tdl_sync_channel_v1", "tdl_hardcore", nil) end
-    
     DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDL]|r " .. (GetLocale() == "zhCN" and "感谢您的共享精神，查询功能已完全解锁！" or "Thank you for sharing! Query unlocked."))
     TDL_UpdateList()
 end)
 
 local joinDesc = TDL_MainFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-joinDesc:SetPoint("RIGHT", toggleBtn, "LEFT", -10, 0)
-joinDesc:SetText(L["JOIN_DESC"])
-joinDesc:SetTextColor(0.9, 0.8, 0.4) 
+joinDesc:SetPoint("RIGHT", toggleBtn, "LEFT", -10, 0); joinDesc:SetText(L["JOIN_DESC"]); joinDesc:SetTextColor(0.9, 0.8, 0.4) 
 
 local lockWarning = TDL_MainFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-lockWarning:SetPoint("CENTER", TDL_MainFrame, "CENTER", 0, -30)
-lockWarning:SetText(L["LOCK_WARNING"])
-lockWarning:SetJustifyH("CENTER")
-lockWarning:SetTextColor(1, 0.2, 0.2)
-lockWarning:Hide()
+lockWarning:SetPoint("CENTER", TDL_MainFrame, "CENTER", 0, -30); lockWarning:SetText(L["LOCK_WARNING"]); lockWarning:SetJustifyH("CENTER"); lockWarning:SetTextColor(1, 0.2, 0.2); lockWarning:Hide()
 TDL_LockWarningText = lockWarning
 
 TDL_MainFrame:SetScript("OnShow", function()
-    if TDL_UI_Unlocked then
-        TDL_ToggleBtn:SetText(L["BTN_ON"])
-        TDL_ToggleBtn:Disable()
-    else
-        TDL_ToggleBtn:SetText(L["BTN_START"])
-        TDL_ToggleBtn:Enable()
-    end
+    if TDL_UI_Unlocked then TDL_ToggleBtn:SetText(L["BTN_ON"]); TDL_ToggleBtn:Disable() else TDL_ToggleBtn:SetText(L["BTN_START"]); TDL_ToggleBtn:Enable() end
     if TDL_UpdateList then TDL_UpdateList() end
 end)
 
@@ -212,26 +182,21 @@ StaticPopupDialogs["TDL_CONFIRM_BUG_DEATH"] = {
     OnAccept = function()
         local name, lvl = UnitName("player"), UnitLevel("player")
         local zone = GetZoneText() or "Unknown Zone"
-        -- 核心：作为国际版，自定义死因必须存为英文，显示时再靠UI翻译！
         local killer = "Custom Cause" 
-        
         local timeStr = TDL_GetServerTimeStr and TDL_GetServerTimeStr() or date("%Y-%m-%d %H:%M")
         local deathData = name.."#"..lvl.."#"..zone.."#"..killer.."#"..timeStr
         local m = date("%Y-%m")
-        
         if type(TDL_HistoryDB[m]) ~= "table" then TDL_HistoryDB[m] = {} end
         table.insert(TDL_HistoryDB[m], deathData)
-        if TDL_RequestSync then
-            table.insert(TDL_SendQueue, "TDL_DEATH:"..m.."^"..deathData)
-        end
+        if TDL_RequestSync then table.insert(TDL_SendQueue, "TDL_DEATH:"..m.."^"..deathData) end
         TDL_UpdateList()
     end,
     timeout = 0, whileDead = true, hideOnEscape = true,
 }
 
 local columns = {
-    { text = L["H_NAME"],  x = 30 }, { text = L["H_LVL"],   x = 130 },
-    { text = L["H_ZONE"],  x = 220 }, { text = L["H_CAUSE"], x = 400 }, { text = L["H_TIME"],  x = 600 }
+    { text = L["H_NAME"],  x = 30 }, { text = L["H_LVL"],   x = 135 },
+    { text = L["H_ZONE"],  x = 180 }, { text = L["H_CAUSE"], x = 360 }, { text = L["H_TIME"],  x = 560 }
 }
 for _, col in ipairs(columns) do
     local h = TDL_MainFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -243,11 +208,9 @@ local scrollFrame = CreateFrame("ScrollFrame", "TDL_ScrollFrame", TDL_MainFrame,
 scrollFrame:SetWidth(690)
 scrollFrame:SetHeight(240)
 scrollFrame:SetPoint("TOPLEFT", TDL_MainFrame, "TOPLEFT", 20, -130)
-
-TDL_ScrollFrameScrollBar:ClearAllPoints()
-TDL_ScrollFrameScrollBar:SetPoint("TOPRIGHT", TDL_MainFrame, "TOPRIGHT", -35, -146)
-TDL_ScrollFrameScrollBar:SetPoint("BOTTOMRIGHT", TDL_MainFrame, "BOTTOMRIGHT", -35, 100)
-TDL_ScrollFrameScrollBar:SetValueStep(24) 
+scrollFrame:SetScript("OnVerticalScroll", function()
+    FauxScrollFrame_OnVerticalScroll(24, TDL_UpdateList)
+end)
 
 for i = 1, 10 do
     local row = CreateFrame("Frame", "TDL_DataRow"..i, TDL_MainFrame)
@@ -259,9 +222,18 @@ for i = 1, 10 do
     row.killer = row:CreateFontString(nil, "OVERLAY", "GameFontRedSmall") 
     row.time   = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 
-    row.name:SetPoint("LEFT", row, "LEFT", 10, 0); row.level:SetPoint("LEFT", row, "LEFT", 110, 0)
-    row.zone:SetPoint("LEFT", row, "LEFT", 200, 0); row.killer:SetPoint("LEFT", row, "LEFT", 380, 0)
-    row.time:SetPoint("LEFT", row, "LEFT", 580, 0); row:Hide()
+    row.name:SetWidth(95); row.name:SetJustifyH("LEFT")
+    row.level:SetWidth(35); row.level:SetJustifyH("CENTER")
+    row.zone:SetWidth(170); row.zone:SetJustifyH("LEFT")
+    row.killer:SetWidth(190); row.killer:SetJustifyH("LEFT")
+    row.time:SetWidth(120); row.time:SetJustifyH("RIGHT")
+
+    row.name:SetPoint("LEFT", row, "LEFT", 10, 0)
+    row.level:SetPoint("LEFT", row.name, "RIGHT", 5, 0)
+    row.zone:SetPoint("LEFT", row.level, "RIGHT", 10, 0)
+    row.killer:SetPoint("LEFT", row.zone, "RIGHT", 10, 0)
+    row.time:SetPoint("LEFT", row.killer, "RIGHT", 10, 0)
+    row:Hide()
 end
 
 local function SafeLower(str)
@@ -275,11 +247,24 @@ local function SafeLower(str)
 end
 local function CleanInput(eb) return SafeLower(string.gsub(eb:GetText() or "", "^%s*(.-)%s*$", "%1")) end
 
+local function GetAbsoluteDay(dateStr)
+    if type(dateStr) ~= "string" then return 0 end
+    local _, _, y, m, d = string.find(dateStr, "(%d+)%-(%d+)%-(%d+)")
+    if not y then return 0 end
+    y, m, d = tonumber(y), tonumber(m), tonumber(d)
+    if not y or not m or not d then return 0 end
+    local days = y * 365 + math.floor(y/4) - math.floor(y/100) + math.floor(y/400)
+    local monthDays = {31,28,31,30,31,30,31,31,30,31,30,31}
+    for i = 1, m-1 do days = days + monthDays[i] end
+    if m > 2 and ((math.mod(y, 4) == 0 and math.mod(y, 100) ~= 0) or math.mod(y, 400) == 0) then days = days + 1 end
+    days = days + d
+    return days
+end
+
 local filteredData = {}
 
 function TDL_UpdateList()
     if not TDL_UI_Unlocked then
-        TDL_ScrollFrameScrollBar:Hide()
         for i = 1, 10 do getglobal("TDL_DataRow"..i):Hide() end
         if TDL_LockWarningText then TDL_LockWarningText:Show() end
         return
@@ -288,6 +273,10 @@ function TDL_UpdateList()
     end
 
     filteredData = {}
+    
+    -- 获取新增的玩家姓名过滤
+    local fName = CleanInput(TDL_NameEB)
+    
     local minLvlStr = string.gsub(TDL_MinLevelEB:GetText() or "", "^%s*(.-)%s*$", "%1")
     local maxLvlStr = string.gsub(TDL_MaxLevelEB:GetText() or "", "^%s*(.-)%s*$", "%1")
     local minLvl, maxLvl = 1, 60
@@ -304,48 +293,61 @@ function TDL_UpdateList()
     local fZone = CleanInput(TDL_ZoneEB)
     if type(TDL_HistoryDB) ~= "table" then TDL_HistoryDB = {} end
     
+    local sevenDaysAgoAbs = 0
+    if not TDL_ViewAllHistory then
+        local currentDateStr = string.sub(TDL_GetServerTimeStr and TDL_GetServerTimeStr() or date("%Y-%m-%d"), 1, 10)
+        sevenDaysAgoAbs = GetAbsoluteDay(currentDateStr) - 7
+    end
+    
     for month, dataArr in pairs(TDL_HistoryDB) do
-        if TDL_ViewAllHistory or month == date("%Y-%m") then
-            for _, dataStr in ipairs(dataArr) do
-                local parts = {}
-                local currentPos = 1
-                while true do
-                    local startPos, endPos = string.find(dataStr, "#", currentPos)
-                    if not startPos then table.insert(parts, string.sub(dataStr, currentPos)) break end
-                    table.insert(parts, string.sub(dataStr, currentPos, startPos - 1))
-                    currentPos = endPos + 1
+        for _, dataStr in ipairs(dataArr) do
+            local parts = {}
+            local currentPos = 1
+            while true do
+                local startPos, endPos = string.find(dataStr, "#", currentPos)
+                if not startPos then table.insert(parts, string.sub(dataStr, currentPos)) break end
+                table.insert(parts, string.sub(dataStr, currentPos, startPos - 1))
+                currentPos = endPos + 1
+            end
+            
+            local name, lvl, rawZone, rawKiller, timeStr
+            if table.getn(parts) >= 7 then
+                name, lvl, rawZone, rawKiller, timeStr = parts[1], parts[2], parts[5], parts[6], parts[7]
+            elseif table.getn(parts) >= 5 then
+                name, lvl, rawZone, rawKiller, timeStr = parts[1], parts[2], parts[3], parts[4], parts[5]
+            end
+            
+            if name then
+                local include = true
+                if not TDL_ViewAllHistory and timeStr then
+                    local recordDate = string.sub(timeStr, 1, 10)
+                    local recAbs = GetAbsoluteDay(recordDate)
+                    if recAbs > 0 and recAbs < sevenDaysAgoAbs then include = false end
                 end
                 
-                local name, lvl, rawZone, rawKiller, timeStr
-                if table.getn(parts) >= 7 then
-                    name, lvl, rawZone, rawKiller, timeStr = parts[1], parts[2], parts[5], parts[6], parts[7]
-                elseif table.getn(parts) >= 5 then
-                    name, lvl, rawZone, rawKiller, timeStr = parts[1], parts[2], parts[3], parts[4], parts[5]
-                end
-                
-                if name then
-                    -- 【国际版架构：UI 层实时翻译】
+                if include then
                     local dispZone = rawZone
                     local dispKiller = rawKiller
                     
                     if GetLocale() == "zhCN" and TDL_Translate then
                         dispZone = TDL_Translate(rawZone, "ZONE")
-                        
                         local origK = rawKiller
                         local isPvP = false
                         if string.find(string.lower(rawKiller), " %-pvp$") then
                             origK = string.sub(rawKiller, 1, string.len(rawKiller) - 5)
                             isPvP = true
                         end
-                        
                         dispKiller = TDL_Translate(origK, "NPC")
                         if dispKiller == "Custom Cause" then dispKiller = "|cffFF0000自定义死因|r" end
                         if isPvP then dispKiller = dispKiller .. " -pvp" end
                     end
                     
                     local match = true
+                    -- 检查等级
                     if tonumber(lvl) < minLvl or tonumber(lvl) > maxLvl then match = false end
-                    -- 双语兼容搜索：搜中文（翻译后）或英文（原始名）都可以命中
+                    -- 检查姓名
+                    if fName ~= "" and not string.find(SafeLower(name), fName, 1, true) then match = false end
+                    -- 检查区域/死因
                     if fZone ~= "" and not string.find(SafeLower(dispZone), fZone, 1, true) and not string.find(SafeLower(dispKiller), fZone, 1, true) and not string.find(SafeLower(rawZone), fZone, 1, true) and not string.find(SafeLower(rawKiller), fZone, 1, true) then 
                         match = false 
                     end
@@ -362,16 +364,14 @@ function TDL_UpdateList()
     end)
     
     local numResults = table.getn(filteredData)
-    local maxScroll = (numResults - 10) * 24
-    if maxScroll < 0 then maxScroll = 0 end
-    TDL_ScrollFrameScrollBar:SetMinMaxValues(0, maxScroll)
-    if numResults > 10 then TDL_ScrollFrameScrollBar:Show() else TDL_ScrollFrameScrollBar:SetValue(0); TDL_ScrollFrameScrollBar:Hide() end
+    FauxScrollFrame_Update(TDL_ScrollFrame, numResults, 10, 24)
+    local offset = FauxScrollFrame_GetOffset(TDL_ScrollFrame)
     
-    local offset = math.floor(((TDL_ScrollFrameScrollBar:GetValue() or 0) / 24) + 0.5)
     for i = 1, 10 do
         local row = getglobal("TDL_DataRow"..i)
-        if offset + i <= numResults then
-            local data = filteredData[offset + i]
+        local dataIndex = offset + i
+        if dataIndex <= numResults then
+            local data = filteredData[dataIndex]
             row.name:SetText(data[1] or "")
             row.level:SetText(data[2] or "")
             row.zone:SetText(data[3] or "")
@@ -382,40 +382,15 @@ function TDL_UpdateList()
     end
 end
 
-scrollFrame:SetScript("OnVerticalScroll", function()
-    local scrollbar = getglobal(this:GetName().."ScrollBar")
-    scrollbar:SetValue(arg1); TDL_UpdateList()
-end)
-
 TDL_MinimapButton = CreateFrame("Button", "TDL_MinimapButton", Minimap)
-TDL_MinimapButton:SetWidth(33)
-TDL_MinimapButton:SetHeight(33)
-TDL_MinimapButton:SetFrameStrata("MEDIUM")
-TDL_MinimapButton:SetMovable(true)
-
+TDL_MinimapButton:SetWidth(33); TDL_MinimapButton:SetHeight(33); TDL_MinimapButton:SetFrameStrata("MEDIUM"); TDL_MinimapButton:SetMovable(true)
 TDL_MinimapButton:SetNormalTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
 local nt = TDL_MinimapButton:GetNormalTexture()
-if nt then
-    nt:SetTexCoord(0.75, 1, 0.25, 0.5)
-    nt:ClearAllPoints()
-    nt:SetWidth(21)
-    nt:SetHeight(21)
-    nt:SetPoint("CENTER", TDL_MinimapButton, "CENTER", 0, 0)
-end
-
+if nt then nt:SetTexCoord(0.75, 1, 0.25, 0.5); nt:ClearAllPoints(); nt:SetWidth(21); nt:SetHeight(21); nt:SetPoint("CENTER", TDL_MinimapButton, "CENTER", 0, 0) end
 local icon = TDL_MinimapButton:CreateTexture("TDL_MinimapButtonIcon", "BACKGROUND")
-icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
-icon:SetTexCoord(0.75, 1, 0.25, 0.5)
-icon:SetWidth(21)
-icon:SetHeight(21)
-icon:SetPoint("CENTER", TDL_MinimapButton, "CENTER", 0, 0)
-
+icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons"); icon:SetTexCoord(0.75, 1, 0.25, 0.5); icon:SetWidth(21); icon:SetHeight(21); icon:SetPoint("CENTER", TDL_MinimapButton, "CENTER", 0, 0)
 local border = TDL_MinimapButton:CreateTexture(nil, "OVERLAY")
-border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-border:SetWidth(56)
-border:SetHeight(56)
-border:SetPoint("TOPLEFT", TDL_MinimapButton, "TOPLEFT", 0, 0)
-
+border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder"); border:SetWidth(56); border:SetHeight(56); border:SetPoint("TOPLEFT", TDL_MinimapButton, "TOPLEFT", 0, 0)
 TDL_MinimapButton:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 
 if not TDL_MinimapAngle then TDL_MinimapAngle = 45 end
@@ -436,11 +411,7 @@ TDL_MinimapButton:SetScript("OnDragStart", function()
     end) 
 end)
 
-TDL_MinimapButton:SetScript("OnDragStop", function() 
-    this:UnlockHighlight() 
-    this:SetScript("OnUpdate", nil) 
-end)
-
+TDL_MinimapButton:SetScript("OnDragStop", function() this:UnlockHighlight() this:SetScript("OnUpdate", nil) end)
 TDL_MinimapButton_UpdatePosition()
 
 TDL_MinimapButton:SetScript("OnEnter", function() 
@@ -449,16 +420,5 @@ TDL_MinimapButton:SetScript("OnEnter", function()
     GameTooltip:AddLine(L["CLICK_TOGGLE"], 1, 1, 1) 
     GameTooltip:Show() 
 end)
-
-TDL_MinimapButton:SetScript("OnLeave", function() 
-    GameTooltip:Hide() 
-end)
-
-TDL_MinimapButton:SetScript("OnClick", function() 
-    if TDL_MainFrame:IsVisible() then 
-        TDL_MainFrame:Hide() 
-    else 
-        TDL_MainFrame:Show()
-        TDL_UpdateList() 
-    end 
-end)
+TDL_MinimapButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+TDL_MinimapButton:SetScript("OnClick", function() if TDL_MainFrame:IsVisible() then TDL_MainFrame:Hide() else TDL_MainFrame:Show(); TDL_UpdateList() end end)
