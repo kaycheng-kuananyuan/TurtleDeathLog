@@ -1,8 +1,9 @@
 -- ==========================================================
--- Core.lua - Turtle Death Log (V1.4.0)
+-- Core.lua - Turtle Death Log (V2.0.0修复章鱼服卡死)
 -- ==========================================================
 if type(TDL_HistoryDB) ~= "table" then TDL_HistoryDB = {} end
 
+-- 动态获取服务器月份
 local function GetCurrentMonth()
     if GetGameTime then
         local srvHour, srvMin = GetGameTime()
@@ -385,9 +386,15 @@ delayFrame:SetScript("OnUpdate", function()
     end
 end)
 
+-- ==========================================
+-- 重点更新区：分段解析，彻底解决引擎死机回溯
+-- ==========================================
 local function ParseDeathMessage(msg)
-    if not msg then return nil, nil, nil, nil end
-    if not (string.find(msg, "fallen") or string.find(msg, "died") or string.find(msg, "Killed by") or string.find(msg, "击杀") or string.find(msg, "享年") or string.find(msg, "摔死") or string.find(msg, "溺水") or string.find(msg, "淹死") or string.find(msg, "岩浆") or string.find(msg, "烧死") or string.find(msg, "跌死")) then
+    if type(msg) ~= "string" then return nil, nil, nil, nil end
+    if not (string.find(msg, "fallen") or string.find(msg, "died") or string.find(msg, "Killed by") or 
+            string.find(msg, "击杀") or string.find(msg, "享年") or string.find(msg, "摔死") or 
+            string.find(msg, "溺水") or string.find(msg, "淹死") or string.find(msg, "岩浆") or 
+            string.find(msg, "烧死") or string.find(msg, "跌死")) then
         return nil, nil, nil, nil
     end
     
@@ -398,29 +405,75 @@ local function ParseDeathMessage(msg)
     local name, zone, killer, level
     local isPvP = false
 
-    if string.find(cleanMsg, "fallen in PvP") or string.find(cleanMsg, "Mak'gora") or string.find(cleanMsg, "决斗") or string.find(cleanMsg, "被玩家") or string.find(cleanMsg, "级玩家") or string.find(cleanMsg, "%[PVP") then isPvP = true end
+    if string.find(cleanMsg, "fallen in PvP") or string.find(cleanMsg, "Mak'gora") or 
+       string.find(cleanMsg, "决斗") or string.find(cleanMsg, "被玩家") or 
+       string.find(cleanMsg, "级玩家") or string.find(cleanMsg, "%[PVP") then 
+       isPvP = true 
+    end
 
-    if not name then _, _, name, level, killer, zone = string.find(cleanMsg, "character (.-) %(level (%d+)%) has fallen.-to (.-) %(level %d+%) in (.-)%.") end
-    if not name then _, _, level, name, zone, killer = string.find(cleanMsg, "Level (%d+) %S+ (.-) has died in (.-)%. Killed by (.-)%.") end
-    if not name then _, _, level, name, zone = string.find(cleanMsg, "Level (%d+) %S+ (.-) has died in (.-)%.") if name then killer = "Environment" end end
+    -- 1. 英文格式保护 (格式固定不变，安全匹配)
+    if not name then _, _, name, level, killer, zone = string.find(cleanMsg, "character ([^%(]+) %(level (%d+)%) has fallen.-to ([^%(]+) %(level %d+%) in ([^%.]+)%.") end
+    if not name then _, _, level, name, zone, killer = string.find(cleanMsg, "Level (%d+) %S+ ([^%s]+) has died in ([^%.]+)%. Killed by ([^%.]+)%.") end
+    if not name then _, _, level, name, zone = string.find(cleanMsg, "Level (%d+) %S+ ([^%s]+) has died in ([^%.]+)%.") if name then killer = "Environment" end end
 
+    -- 2. 中文格式优化 (新旧格式与错位格式全兼容，无回溯死机风险)
     if not name and not TDL_ForceEnglish then
-        if string.find(cleanMsg, "occurred") and string.find(cleanMsg, "被.-级玩家") then _, _, killer, level, name = string.find(cleanMsg, "被(.-)级玩家(%d+)击杀.-享年(.-)级") end
-        if not name then _, _, name, zone, killer, level = string.find(cleanMsg, "玩家%s*(.-)%s*在(.-)被.-级(.-)击杀.-(%d+)级") end
-        if not name then _, _, name, zone, killer, level = string.find(cleanMsg, "玩家%s*(.-)%s*在(.-)被(.-)击杀.-(%d+)级") end
-        if not name then _, _, level, name, zone, killer = string.find(cleanMsg, "(%d+)级.-玩家%s*(.-)%s*在(.-)被.-级(.-)击杀") end
-        if not name then _, _, level, name, zone, killer = string.find(cleanMsg, "(%d+)级.-玩家%s*(.-)%s*在(.-)被(.-)击杀") end
-        if not name then
-            local keywords = {"摔死", "溺水", "淹死", "岩浆", "烧死", "跌死"}
-            for _, kw in ipairs(keywords) do
-                _, _, name, zone, level = string.find(cleanMsg, "玩家%s*(.-)%s*在(.-)"..kw..".-(%d+)级")
-                if name then killer = kw break end
+        -- 安全提取所有数字以找寻等级
+        local lvls = {}
+        for num in string.gfind(cleanMsg, "(%d+)") do
+            table.insert(lvls, num)
+        end
+        local parsedLevel = lvls[table.getn(lvls)]
+        
+        -- A. 环境死亡匹配
+        local envKeywords = {"摔死", "溺水", "淹死", "岩浆", "烧死", "跌死"}
+        for _, kw in ipairs(envKeywords) do
+            if string.find(cleanMsg, kw) then
+                _, _, name = string.find(cleanMsg, "玩家%s*([^%s在]+)")
+                if not name then _, _, name = string.find(cleanMsg, "([^%s]+)%s*在") end
+                _, _, zone = string.find(cleanMsg, "在%s*([^" .. kw .. "]+)")
+                if name then
+                    killer = kw
+                    level = parsedLevel or "0"
+                    break
+                end
+            end
+        end
+
+        -- B. 击杀死亡匹配 (采用无贪婪多步拆分，彻底避免死锁)
+        if not name and string.find(cleanMsg, "击杀") then
+            -- 提取玩家名字
+            _, _, name = string.find(cleanMsg, "玩家%s*([^%s在被]+)")
+            if not name then _, _, name = string.find(cleanMsg, "享年%d+级%s*([^%s]+)") end
+            if not name then _, _, name = string.find(cleanMsg, "级%S*%s+([^%s在被]+)%s*在") end
+            
+            -- 提取区域地点
+            _, _, zone = string.find(cleanMsg, "在%s*([^%s被]+)")
+            
+            -- 提取杀手信息并剥离冗余等级修饰
+            local rawKiller
+            _, _, rawKiller = string.find(cleanMsg, "被([^击杀]+)击杀")
+            if rawKiller then
+                _, _, killer = string.find(rawKiller, "级玩家%s*(.+)")
+                if not killer then _, _, killer = string.find(rawKiller, "级%s*(.+)") end
+                if not killer then killer = rawKiller end
+            end
+
+            -- 信息有效性验证
+            if name and killer then
+                level = parsedLevel or "0"
+                if not zone then zone = "Unknown Zone" end
+            else
+                name = nil -- 验证失败抛弃
             end
         end
     end
 
+    -- 3. 数据清洗与兜底处理
     if name and killer and zone and level then
+        -- 非法记录抛弃处理 (防止名字带空格或等级缺失的脏数据存入)
         if string.find(name, " ") or not tonumber(level) then return nil, nil, nil, nil end
+        
         name = string.gsub(name, "^%s*(.-)%s*$", "%1")
         zone = string.gsub(zone, "^%s*(.-)%s*$", "%1")
         killer = string.gsub(killer, "^%s*(.-)%s*$", "%1")
@@ -463,7 +516,6 @@ coreFrame:SetScript("OnEvent", function()
             if arg2 then TDL_ActiveUsers[arg2] = GetTime() end 
             
             if arg2 ~= UnitName("player") then
-                -- [V1.4.0 核心更新]: 同步时抓取整个数据库过去20天的数据
                 if string.find(arg1, "^TDL_REQ_SYNC") then
                     if TDL_SyncDelayTimer <= 0 then
                         TDL_PendingSyncQueue = {}
@@ -488,7 +540,6 @@ coreFrame:SetScript("OnEvent", function()
                                     if timeStr and string.len(timeStr) <= 16 then
                                         local recDate = string.sub(timeStr, 1, 10)
                                         local recAbs = GetAbsoluteDay(recDate)
-                                        -- 提取最近20天的有效数据
                                         if recAbs > 0 and (currentAbs - recAbs) <= 20 and (currentAbs - recAbs) >= 0 then
                                             table.insert(recentRecords, {month = m, data = rec, t = timeStr})
                                         end
@@ -497,10 +548,8 @@ coreFrame:SetScript("OnEvent", function()
                             end
                         end
                         
-                        -- 按时间倒序排序 (最新在前)
                         table.sort(recentRecords, function(a, b) return a.t > b.t end)
                         
-                        -- 为了防止频道发送拥堵掉线，最多选取最近25条发送
                         local maxSync = 25
                         local syncCount = table.getn(recentRecords)
                         if syncCount > maxSync then syncCount = maxSync end
