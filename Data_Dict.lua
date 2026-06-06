@@ -1,6 +1,6 @@
--- Data_Dict.lua - TDL-data(v1.3.3)
+-- Data_Dict.lua - TDL-data(v1.3.4)
 -- 更新说明：更新了临时地区和临时怪物的手动添加区域
-TDL_Dict_Version = "1.3.3"
+TDL_Dict_Version = "1.3.4"
 
 TDL_ZoneDict = {
 ["Emberstone Mine"] = "余烬矿洞",
@@ -9249,6 +9249,16 @@ TDL_TempZoneDict = {
 ["Lakeridge Highway"] = "湖畔大道",
 ["Darkmist Cavern"] = "黑雾洞穴",
 ["Field of Giants"] = "巨人原野",
+["Deathknell"] = "丧钟镇",
+["Coldridge Valley"] = "寒脊山谷",
+["Amberstill Ranch"] = "琥珀酒农场",
+["Northfold Manor"] = "诺斯弗德农场",
+["The Yorgen Farmstead"] = "约根农场",
+["Crystal Lake"] = "水晶湖",
+["Red Cloud Mesa"] = "红云台地",
+["Wellspring River"] = "涌泉河",
+["Stonesplinter Valley"] = "碎石山谷",
+["Echo Isles"] = "回音群岛",
 }
 
 -- ==========================================================
@@ -9264,6 +9274,8 @@ TDL_TempNPCDict = {
 ["Foreman Grills"] = "工头格里尔斯",
 ["Darkmist Recluse"] = "黑雾隐遁者",
 ["Silithid Swarm"] = "异种虫群",
+["Morgaine the Sly"] = "狡猾的莫盖恩",
+["Defias Night Blade"] = "迪菲亚夜刃刺客",
 }
 
 -- 核心翻译引擎 (已升级支持独立的临时地名和临时怪物字典)
