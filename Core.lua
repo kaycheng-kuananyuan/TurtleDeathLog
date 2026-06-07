@@ -1,5 +1,5 @@
 -- ==========================================================
--- Core.lua - Turtle Death Log (V2.0.0修复章鱼服卡死)
+-- Core.lua - Turtle Death Log (V2.0.1修复章鱼服卡死)
 -- ==========================================================
 if type(TDL_HistoryDB) ~= "table" then TDL_HistoryDB = {} end
 
@@ -431,7 +431,11 @@ local function ParseDeathMessage(msg)
             if string.find(cleanMsg, kw) then
                 _, _, name = string.find(cleanMsg, "玩家%s*([^%s在]+)")
                 if not name then _, _, name = string.find(cleanMsg, "([^%s]+)%s*在") end
-                _, _, zone = string.find(cleanMsg, "在%s*([^" .. kw .. "]+)")
+                
+                -- 【修复】：支持带空格的英文地名，直到遇到死因关键字才停止
+                _, _, zone = string.find(cleanMsg, "在%s*(.-)%s*" .. kw)
+                if not zone then _, _, zone = string.find(cleanMsg, "在%s*([^" .. kw .. "]+)") end
+                
                 if name then
                     killer = kw
                     level = parsedLevel or "0"
@@ -447,8 +451,9 @@ local function ParseDeathMessage(msg)
             if not name then _, _, name = string.find(cleanMsg, "享年%d+级%s*([^%s]+)") end
             if not name then _, _, name = string.find(cleanMsg, "级%S*%s+([^%s在被]+)%s*在") end
             
-            -- 提取区域地点
-            _, _, zone = string.find(cleanMsg, "在%s*([^%s被]+)")
+            -- 【修复】：提取区域地点（支持空格，遇到“被”字才停止匹配）
+            _, _, zone = string.find(cleanMsg, "在%s*(.-)%s*被")
+            if not zone then _, _, zone = string.find(cleanMsg, "在%s*([^被]+)") end
             
             -- 提取杀手信息并剥离冗余等级修饰
             local rawKiller
@@ -593,6 +598,21 @@ coreFrame:SetScript("OnEvent", function()
                             if TDL_MainFrame and TDL_MainFrame:IsVisible() and TDL_UpdateList then TDL_UpdateList() end
                         end
                     end
+                end
+            end
+        else
+            -- 【新增】：捕获 [HC] 等其他聊天频道的死亡通告
+            local name, level, killer, broadcastZone = ParseDeathMessage(arg1)
+            if name and level and killer then
+                local timeStr = TDL_GetServerTimeStr()
+                local rawFallbackZone = broadcastZone or GetZoneText() or "Unknown Zone"
+                if GetLocale() == "zhCN" and rawFallbackZone ~= "Unknown Zone" then rawFallbackZone = TDL_GetEnglish(rawFallbackZone, "ZONE") or rawFallbackZone end
+                
+                local cM = GetCurrentMonth()
+                local deathData = name.."#"..level.."#"..rawFallbackZone.."#"..killer.."#"..timeStr
+                if InsertOrMergeRecord(cM, deathData) then
+                    table.insert(TDL_SendQueue, PREFIX_DEATH .. cM .. "^" .. deathData)
+                    if TDL_MainFrame and TDL_MainFrame:IsVisible() and TDL_UpdateList then TDL_UpdateList() end
                 end
             end
         end
