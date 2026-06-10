@@ -1,21 +1,10 @@
 -- ==========================================================
--- Core.lua - Turtle Death Log (V2.0.1修复章鱼服卡死)
+-- Core.lua - Turtle Death Log (V2.0.1修复章鱼服卡死 + 跨时区与自动清理优化版)
 -- ==========================================================
 if type(TDL_HistoryDB) ~= "table" then TDL_HistoryDB = {} end
 
--- 动态获取服务器月份
+-- 动态获取服务器月份（统一使用本地时间，解决时差丢数据问题）
 local function GetCurrentMonth()
-    if GetGameTime then
-        local srvHour, srvMin = GetGameTime()
-        if srvHour and srvMin then
-            local locTime = time()
-            local d = date("*t", locTime)
-            local hourDiff = srvHour - d.hour
-            if hourDiff > 12 then locTime = locTime - 86400 elseif hourDiff < -12 then locTime = locTime + 86400 end
-            local newD = date("*t", locTime)
-            return string.format("%04d-%02d", newD.year, newD.month)
-        end
-    end
     return date("%Y-%m")
 end
 
@@ -82,18 +71,9 @@ local function TDL_GetEnglish(cnText, dictType)
     return cnText
 end
 
+-- 获取记录时间（统一使用本地时间，彻底杜绝服务器时间跨日或跨月溢出）
 function TDL_GetServerTimeStr()
-    if not GetGameTime then return date("%Y-%m-%d %H:%M") end
-    local srvHour, srvMin = GetGameTime()
-    if not srvHour or not srvMin then return date("%Y-%m-%d %H:%M") end
-    local locTime = time()
-    local d = date("*t", locTime)
-    
-    local hourDiff = srvHour - d.hour
-    if hourDiff > 12 then locTime = locTime - 86400 elseif hourDiff < -12 then locTime = locTime + 86400 end
-    
-    local newD = date("*t", locTime)
-    return string.format("%04d-%02d-%02d %02d:%02d", newD.year, newD.month, newD.day, srvHour, srvMin)
+    return date("%Y-%m-%d %H:%M")
 end
 
 local isSuperWoW = false
@@ -201,7 +181,8 @@ local function InsertOrMergeRecord(month, dataStr)
             
             if oName and oTimeStr then
                 local oDateAbs = GetAbsoluteDay(GetDateOnly(oTimeStr))
-                if targetDateAbs > 0 and oDateAbs > 0 and oName == name and (oLvl or "0") == (lvl or "0") and math.abs(oDateAbs - targetDateAbs) <= 1 then
+                -- [核心优化]: 将前后1天合并放宽至前后3天合并
+                if targetDateAbs > 0 and oDateAbs > 0 and oName == name and (oLvl or "0") == (lvl or "0") and math.abs(oDateAbs - targetDateAbs) <= 3 then
                     local bestZone, bestKiller = MergeBestData(zone, killer, oZone, oKiller)
                     local bestLvl = lvl or oLvl or "0"
                     local bestTime = GetBest24HTime(targetFullTime, GetMinuteTime(oTimeStr)) or targetFullTime or "2000-01-01 00:00"
@@ -306,6 +287,10 @@ coreFrame:RegisterEvent("CHAT_MSG_INFO")
 coreFrame:RegisterEvent("CHAT_MSG_CHANNEL")
 coreFrame:RegisterEvent("CHAT_MSG_CHANNEL_JOIN")
 coreFrame:RegisterEvent("CHAT_MSG_CHANNEL_LEAVE")
+-- 【新增】：把大喊和公会频道也加入监听，防止私服魔改底层事件
+coreFrame:RegisterEvent("CHAT_MSG_YELL")
+coreFrame:RegisterEvent("CHAT_MSG_MONSTER_YELL")
+coreFrame:RegisterEvent("CHAT_MSG_GUILD")
 
 local delayFrame = CreateFrame("Frame")
 local elapsed = 0
@@ -317,7 +302,10 @@ TDL_PendingSyncQueue = {}
 TDL_SendQueue = {}        
 local TDL_SyncDelayTimer = 0 
 local sendTimer = 0
+
+-- [核心优化]: 定时器配置
 local TDL_AutoCleanTimer = -1
+local TDL_PeriodicCleanTimer = 1800.0 -- 新增: 每30分钟（1800秒）触发一次全局清理
 
 delayFrame:SetScript("OnUpdate", function()
     local dt = arg1 or 0.05
@@ -373,7 +361,8 @@ delayFrame:SetScript("OnUpdate", function()
             TDL_ReceiveData.timer = 0
             TDL_ReceiveData.totalCount = 0
             TDL_ReceiveData.newCount = 0
-            TDL_AutoCleanTimer = 5.0
+            -- [核心优化]: 同步结束后10分钟（600秒）进行一次数据整理
+            TDL_AutoCleanTimer = 600.0
         end
     end
     
@@ -382,6 +371,15 @@ delayFrame:SetScript("OnUpdate", function()
         if TDL_AutoCleanTimer <= 0 then
             TDL_CleanDatabase(true)
             TDL_AutoCleanTimer = -1
+        end
+    end
+
+    -- [核心优化]: 每30分钟执行一次强制定期清理
+    if TDL_PeriodicCleanTimer > 0 then
+        TDL_PeriodicCleanTimer = TDL_PeriodicCleanTimer - dt
+        if TDL_PeriodicCleanTimer <= 0 then
+            TDL_CleanDatabase(true)
+            TDL_PeriodicCleanTimer = 1800.0 -- 重新开始下一个30分钟倒计时
         end
     end
 end)
@@ -502,7 +500,7 @@ coreFrame:SetScript("OnEvent", function()
         if arg9 and string.find(string.lower(arg9), string.lower(SYNC_CHANNEL)) and arg2 then TDL_ActiveUsers[arg2] = GetTime() end
     elseif event == "CHAT_MSG_CHANNEL_LEAVE" then
         if arg9 and string.find(string.lower(arg9), string.lower(SYNC_CHANNEL)) and arg2 then TDL_ActiveUsers[arg2] = nil end
-    elseif event == "CHAT_MSG_SYSTEM" or event == "CHAT_MSG_BROADCAST" or event == "CHAT_MSG_SERVER_EMOTE" or event == "CHAT_MSG_INFO" then
+    elseif event == "CHAT_MSG_SYSTEM" or event == "CHAT_MSG_BROADCAST" or event == "CHAT_MSG_SERVER_EMOTE" or event == "CHAT_MSG_INFO" or event == "CHAT_MSG_YELL" or event == "CHAT_MSG_MONSTER_YELL" or event == "CHAT_MSG_GUILD" then
         local name, level, killer, broadcastZone = ParseDeathMessage(arg1)
         if name and level and killer then
             local timeStr = TDL_GetServerTimeStr()
