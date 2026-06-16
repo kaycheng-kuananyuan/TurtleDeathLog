@@ -1,8 +1,66 @@
--- Data_Dict.lua - TDL-data(v1.3.4)
+-- Data_Dict.lua - TDL-data(v1.3.5)
 -- 更新说明：更新了临时地区和临时怪物的手动添加区域
-TDL_Dict_Version = "1.3.4"
+TDL_Dict_Version = "1.3.5"
 
 TDL_ZoneDict = {
+["Angerfang Encampment"] = "怒牙营地",
+["Agamand Mills"] = "阿加曼德磨坊",
+["Echo Ridge Mine"] = "回音山矿洞",
+["Anchor's Edge"] = "锚角",
+["Black Ash Coalpits"] = "黑灰坑",
+["Boulder Lode Mine"] = "巨石矿洞",
+["Brackwell Pumpkin Patch"] = "布莱克威尔南瓜田",
+["Brinthilien"] = "布林希林",
+["Crystal Lake"] = "水晶湖",
+["Dreadmist Den"] = "恐惧迷雾洞穴",
+["Echo Isles"] = "回音岛",
+["Fargodeep Mine"] = "法戈第矿洞",
+["Fel Rock"] = "恶魔岩",
+["Felstrider Retreat"] = "魔步者营地",
+["Frostmane Hold"] = "霜鬃要塞",
+["Gold Coast Quarry"] = "金海岸矿洞",
+["Ironband's Excavation Site"] = "铁环挖掘场",
+["Jangolode Mine"] = "詹戈洛德矿洞",
+["Jasperlode Mine"] = "贾斯伯矿洞",
+["Jerod's Landing"] = "杰罗德码头",
+["Kolkar Crag"] = "科卡尔峭壁",
+["Lake Everstill"] = "止水湖",
+["Longshore"] = "朗绍尔海岸",
+["Lushwater Oasis"] = "甜水绿洲",
+["Moonbrook"] = "月溪镇",
+["North Gate Pass"] = "北门小径",
+["Ruins of Nashal'aran"] = "纳沙拉兰废墟",
+["Shatter Scar Vale"] = "碎痕谷",
+["Stone Cairn Lake"] = "石碑湖",
+["The Altar of Zul"] = "祖尔祭坛",
+["The Dustbowl"] = "尘土盆地",
+["The Grizzled Den"] = "灰熊洞穴",
+["The Lost Fleet"] = "失落的舰队",
+["The Merchant Coast"] = "商人海岸",
+["The North Coast"] = "北部海岸",
+["The Stockpile"] = "储备所",
+["The Yorgen Farmstead"] = "约根农场",
+["Thorn Hill"] = "荆棘山",
+["Valley of Bones"] = "白骨之谷",
+["Valley of Trials"] = "试炼谷",
+["Venomweb Vale"] = "毒网谷",
+["Witch Hill"] = "女巫岭",
+["Windhorn Canyon"] = "风角峡谷",
+["The Farstride"] = "远行者营地",
+["Durnholde Keep"] = "敦霍尔德城堡",
+["Bramblethorn Pass"] = "荆刺小径",
+["The Charred Vale"] = "焦炭谷",
+["Northwatch Hold"] = "北方城堡",
+["The Venture Co"] = "风险投资公司",
+["Twilight Vale"] = "暮光谷",
+["Shadowglen"] = "幽影谷",
+["Starbreeze Village"] = "星风村",
+["Stormwind Harbor"] = "暴风城港口",
+["Mirror Lake"] = "明镜湖",
+["Twilight Shore"] = "暮光海岸",
+["Red Cloud Roost"] = "红云栖地",
+["Anasterian Park"] = "安纳斯特里安公园",
+["Wellspring River"] = "源泉河",
 ["Emberstone Mine"] = "余烬矿洞",
 ["Lost Rigger Cove"] = "失落索具湾",
 ["Forest's Edge"] = "森林边缘",
@@ -9211,6 +9269,8 @@ TDL_NPCDict = {
 ["Gadgetzan Peacekeeper"] = "地精执法者",
 ["Northridge Defender"] = "北风岭守卫",
 ["Moonglade Sentinel"] = "月语海岸哨兵",
+["Blackwind Bloodguard"] = "黑风血卫士",
+["Crimson Hawkstrider"] = "深红陆行鸟",
 }
 
 
@@ -9259,6 +9319,9 @@ TDL_TempZoneDict = {
 ["Wellspring River"] = "涌泉河",
 ["Stonesplinter Valley"] = "碎石山谷",
 ["Echo Isles"] = "回音群岛",
+["Silver Sun Mine"] = "银日矿洞",
+["Silver Stream Mine"] = "银流矿洞",
+["Lushwater Oasis"] = "甜水绿洲",
 }
 
 -- ==========================================================
@@ -9276,6 +9339,12 @@ TDL_TempNPCDict = {
 ["Silithid Swarm"] = "异种虫群",
 ["Morgaine the Sly"] = "狡猾的莫盖恩",
 ["Defias Night Blade"] = "迪菲亚夜刃刺客",
+["Oasis Snapjaw"] = "绿洲钳嘴龟",
+["Defias Looter"] = "迪菲亚强夺者",
+["Riverpaw Outrunner"] = "河爪前锋",
+["Darkeye Bonecaster"] = "暗眼掷骨者",
+["Kodo Calf"] = "科多兽幼崽",
+["Defective Arcane Golem"] = "受损的奥术傀儡",
 }
 
 -- 核心翻译引擎 (已升级支持独立的临时地名和临时怪物字典)
