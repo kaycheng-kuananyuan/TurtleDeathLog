@@ -1,10 +1,10 @@
 -- ==========================================================
--- UI.lua - Turtle Death Log (V2.0.1 )
+-- UI.lua - Turtle Death Log (3.0.1)
 -- ==========================================================
 
 local L = {}
 if GetLocale() == "zhCN" then
-    L["TITLE"] = "全网死亡记录查询 (TDL v2.0.1)"
+    L["TITLE"] = "全网死亡记录查询 (TDL v3.0.1)"
     L["NAME_SEARCH"] = "玩家姓名"
     L["MIN_LVL"] = "最低"
     L["MAX_LVL"] = "最高"
@@ -26,7 +26,7 @@ if GetLocale() == "zhCN" then
     L["H_TIME"] = "死亡时间"
     L["CLICK_TOGGLE"] = "左键点击: 开启/关闭面板\n左键拖动: 改变图标位置"
 else
-    L["TITLE"] = "Turtle Death Log (TDL v2.0.1)"
+    L["TITLE"] = "Turtle Death Log (TDL v3.0.1)"
     L["NAME_SEARCH"] = "Player Name"
     L["MIN_LVL"] = "Min"
     L["MAX_LVL"] = "Max"
@@ -100,18 +100,16 @@ local function CreateFilterEditBox(name, parent, width, labelText, x, y)
     return eb
 end
 
--- 重新计算横向排版，为“玩家姓名”腾出空间
 local startX, gap = 20, 10
 local x1 = startX
-local x2 = x1 + 80 + gap   -- Name (80)
-local x3 = x2 + 40 + gap   -- MinLvl (40)
-local x4 = x3 + 40 + gap   -- MaxLvl (40)
-local x5 = x4 + 110 + gap  -- Zone (110)
-local x6 = x5 + 60 + gap   -- Search (60)
-local x7 = x6 + 65 + gap   -- Sync (65)
-local x8 = x7 + 85 + gap   -- Older (85)
-local x9 = x8 + 75 + gap   -- Fix (75)
--- BugBtn is at x9 (Width 85)
+local x2 = x1 + 80 + gap
+local x3 = x2 + 40 + gap
+local x4 = x3 + 40 + gap
+local x5 = x4 + 110 + gap
+local x6 = x5 + 60 + gap
+local x7 = x6 + 65 + gap
+local x8 = x7 + 85 + gap
+local x9 = x8 + 75 + gap
 
 TDL_NameEB     = CreateFilterEditBox("TDL_NameEB", TDL_MainFrame, 80, L["NAME_SEARCH"], x1, -65)
 TDL_MinLevelEB = CreateFilterEditBox("TDL_MinLevelEB", TDL_MainFrame, 40, L["MIN_LVL"], x2, -65)
@@ -184,11 +182,18 @@ StaticPopupDialogs["TDL_CONFIRM_BUG_DEATH"] = {
         local zone = GetZoneText() or "Unknown Zone"
         local killer = "Custom Cause" 
         local timeStr = TDL_GetServerTimeStr and TDL_GetServerTimeStr() or date("%Y-%m-%d %H:%M")
+        
+        -- 转英文存储 (此处使用无差别反向翻译 TDL_GetEnglish)
+        if GetLocale() == "zhCN" and TDL_GetEnglish then
+            zone = TDL_GetEnglish(zone)
+        end
+        
+        local m = string.sub(timeStr, 1, 7)
         local deathData = name.."#"..lvl.."#"..zone.."#"..killer.."#"..timeStr
-        local m = date("%Y-%m")
         if type(TDL_HistoryDB[m]) ~= "table" then TDL_HistoryDB[m] = {} end
         table.insert(TDL_HistoryDB[m], deathData)
-        if TDL_RequestSync then table.insert(TDL_SendQueue, "TDL_DEATH:"..m.."^"..deathData) end
+        
+        if TDL_SendQueue then table.insert(TDL_SendQueue, "TDL_DEATH:"..m.."^"..deathData) end
         TDL_UpdateList()
     end,
     timeout = 0, whileDead = true, hideOnEscape = true,
@@ -245,6 +250,7 @@ local function SafeLower(str)
     end
     return res
 end
+
 local function CleanInput(eb) return SafeLower(string.gsub(eb:GetText() or "", "^%s*(.-)%s*$", "%1")) end
 
 local function GetAbsoluteDay(dateStr)
@@ -261,6 +267,12 @@ local function GetAbsoluteDay(dateStr)
     return days
 end
 
+local function SplitString(s, p)
+    local rt = {}
+    string.gsub(s, '[^'..p..']+', function(w) table.insert(rt, w) end)
+    return rt
+end
+
 local filteredData = {}
 
 function TDL_UpdateList()
@@ -273,10 +285,7 @@ function TDL_UpdateList()
     end
 
     filteredData = {}
-    
-    -- 获取新增的玩家姓名过滤
     local fName = CleanInput(TDL_NameEB)
-    
     local minLvlStr = string.gsub(TDL_MinLevelEB:GetText() or "", "^%s*(.-)%s*$", "%1")
     local maxLvlStr = string.gsub(TDL_MaxLevelEB:GetText() or "", "^%s*(.-)%s*$", "%1")
     local minLvl, maxLvl = 1, 60
@@ -291,65 +300,43 @@ function TDL_UpdateList()
     if minLvl > maxLvl then minLvl, maxLvl = maxLvl, minLvl end
     
     local fZone = CleanInput(TDL_ZoneEB)
-    if type(TDL_HistoryDB) ~= "table" then TDL_HistoryDB = {} end
+    local todayAbs = GetAbsoluteDay(string.sub(TDL_GetServerTimeStr and TDL_GetServerTimeStr() or date("%Y-%m-%d"), 1, 10))
     
-    local sevenDaysAgoAbs = 0
-    if not TDL_ViewAllHistory then
-        local currentDateStr = string.sub(TDL_GetServerTimeStr and TDL_GetServerTimeStr() or date("%Y-%m-%d"), 1, 10)
-        sevenDaysAgoAbs = GetAbsoluteDay(currentDateStr) - 7
-    end
-    
-    for month, dataArr in pairs(TDL_HistoryDB) do
-        for _, dataStr in ipairs(dataArr) do
-            local parts = {}
-            local currentPos = 1
-            while true do
-                local startPos, endPos = string.find(dataStr, "#", currentPos)
-                if not startPos then table.insert(parts, string.sub(dataStr, currentPos)) break end
-                table.insert(parts, string.sub(dataStr, currentPos, startPos - 1))
-                currentPos = endPos + 1
-            end
-            
-            local name, lvl, rawZone, rawKiller, timeStr
-            if table.getn(parts) >= 7 then
-                name, lvl, rawZone, rawKiller, timeStr = parts[1], parts[2], parts[5], parts[6], parts[7]
-            elseif table.getn(parts) >= 5 then
-                name, lvl, rawZone, rawKiller, timeStr = parts[1], parts[2], parts[3], parts[4], parts[5]
-            end
-            
-            if name then
+    for month, records in pairs(TDL_HistoryDB or {}) do
+        for _, rec in ipairs(records) do
+            local p = SplitString(rec, "#")
+            if table.getn(p) >= 5 then
+                local name, lvl, rawZone, rawKiller, timeStr = p[1], p[2], p[3], p[4], p[5]
                 local include = true
-                if not TDL_ViewAllHistory and timeStr then
-                    local recordDate = string.sub(timeStr, 1, 10)
-                    local recAbs = GetAbsoluteDay(recordDate)
-                    if recAbs > 0 and recAbs < sevenDaysAgoAbs then include = false end
+                
+                if not TDL_ViewAllHistory then
+                    local recAbs = GetAbsoluteDay(string.sub(timeStr, 1, 10))
+                    if todayAbs - recAbs > 7 then include = false end
                 end
                 
                 if include then
-                    local dispZone = rawZone
-                    local dispKiller = rawKiller
+                    local dispZone, dispKiller = rawZone, rawKiller
                     
+                    -- 【修复点】：无差别全局翻译调用，去除了"ZONE"和"NPC"的死板约束
                     if GetLocale() == "zhCN" and TDL_Translate then
-                        dispZone = TDL_Translate(rawZone, "ZONE")
-                        local origK = rawKiller
-                        local isPvP = false
-                        if string.find(string.lower(rawKiller), " %-pvp$") then
-                            origK = string.sub(rawKiller, 1, string.len(rawKiller) - 5)
-                            isPvP = true
-                        end
-                        dispKiller = TDL_Translate(origK, "NPC")
-                        if dispKiller == "Custom Cause" then dispKiller = "|cffFF0000自定义死因|r" end
+                        dispZone = TDL_Translate(rawZone)
+                        local isPvP = string.find(string.lower(rawKiller), "%-pvp$")
+                        local kBase = isPvP and string.sub(rawKiller, 1, -6) or rawKiller
+                        dispKiller = TDL_Translate(kBase)
                         if isPvP then dispKiller = dispKiller .. " -pvp" end
+                        if dispKiller == "Custom Cause" then dispKiller = "|cffFF0000自定义死因|r" end
                     end
                     
                     local match = true
-                    -- 检查等级
-                    if tonumber(lvl) < minLvl or tonumber(lvl) > maxLvl then match = false end
-                    -- 检查姓名
+                    local nLvl = tonumber(lvl) or 0
+                    if nLvl < minLvl or nLvl > maxLvl then match = false end
                     if fName ~= "" and not string.find(SafeLower(name), fName, 1, true) then match = false end
-                    -- 检查区域/死因
-                    if fZone ~= "" and not string.find(SafeLower(dispZone), fZone, 1, true) and not string.find(SafeLower(dispKiller), fZone, 1, true) and not string.find(SafeLower(rawZone), fZone, 1, true) and not string.find(SafeLower(rawKiller), fZone, 1, true) then 
-                        match = false 
+                    if fZone ~= "" then
+                        local zMatch = string.find(SafeLower(dispZone), fZone, 1, true) or
+                                       string.find(SafeLower(dispKiller), fZone, 1, true) or
+                                       string.find(SafeLower(rawZone), fZone, 1, true) or
+                                       string.find(SafeLower(rawKiller), fZone, 1, true)
+                        if not zMatch then match = false end
                     end
                     
                     if match then table.insert(filteredData, {name, lvl, dispZone, dispKiller, timeStr}) end
@@ -358,10 +345,7 @@ function TDL_UpdateList()
         end
     end
     
-    table.sort(filteredData, function(a, b)
-        if not a or not b then return false end
-        return (a[5] or "") > (b[5] or "") 
-    end)
+    table.sort(filteredData, function(a, b) return a[5] > b[5] end)
     
     local numResults = table.getn(filteredData)
     FauxScrollFrame_Update(TDL_ScrollFrame, numResults, 10, 24)
